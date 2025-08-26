@@ -31,13 +31,13 @@ function mapTsTypeToCj(node?: Node) {
     }
     const type = node.getType()
     const typeText = type.getText();
-    if(type.isUnion()){
-       return "Any"
+    if (type.isUnion()) {
+        return "Any"
     }
     return tsTypeToCj(typeText)
 }
 
-function transformNode(node: Node) {
+function transformNode(node: Node, indent = "") {
     let cj = ''
     const kind = node.getKind();
 
@@ -52,12 +52,14 @@ function transformNode(node: Node) {
             const body = funNode.getBody() ? transformNode(funNode.getBody()!) : ""
             cj += `func ${funName}(${params}):${returnType}${body}\n\n`
             break;
-        case ts.SyntaxKind.Block:
+        case ts.SyntaxKind.Block: {
             cj += " {\n";
+            const _indent = `${indent}  `
             node.forEachChild(n => {
-                cj += transformNode(n);
+                cj += `${_indent}${transformNode(n, `${_indent}`)}`;
             })
-            cj += "\n}\n";// console.log('Block',node.getText(),node.getChildAtIndex(2).getKindName(),node.getChildCount()) //console.log("cj",cj)
+            cj += `\n${indent}}`;// console.log('Block',node.getText(),node.getChildAtIndex(2).getKindName(),node.getChildCount()) //console.log("cj",cj)
+        }
             break;
         case ts.SyntaxKind.ReturnStatement:
             const returnNode = node as ReturnStatement;
@@ -109,7 +111,7 @@ function transformNode(node: Node) {
             ifNode.forEachChild(child => {
                 children.push(child);
             })
-            cj += `if(${transformNode(children[0])})${transformNode(children[1])}`;
+            cj += `if(${transformNode(children[0])})${transformNode(children[1], indent)}`;
             break;
         case ts.SyntaxKind.CallExpression:
             break;
