@@ -1,0 +1,11 @@
+[dependencies]
+
+[package]
+  cjc-version = "1.0.1"
+  description = "nothing here"
+  name = "ts2cj"
+  output-type = "executable"
+  src-dir = ""
+  target-dir = ""
+  version = "1.0.0"
+  package-configuration = {}

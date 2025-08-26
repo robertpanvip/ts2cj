@@ -128,11 +128,11 @@ function transformNode(node: Node, indent = "") {
 function convert(input: string, output: string) {
     const project = new Project({})
     const sourceFile = project.addSourceFileAtPath(input);
-    let outputCode = "";
+    let outputCode = "package ts2cj\n";
     sourceFile.forEachChild(node => {
         outputCode += transformNode(node)
     })
     fs.writeFileSync(output, outputCode)
 }
 
-convert(path.resolve(__dirname, './test.ts'), "./test.go");
+convert(path.resolve(__dirname, './test.ts'), "./src/main.cj");
