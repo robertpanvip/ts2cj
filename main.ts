@@ -6,7 +6,7 @@ import {
     ReturnTypedNode,
     ReturnStatement,
     IfStatement,
-    TypeOfExpression
+    TypeOfExpression, VariableStatement, VariableDeclarationKind
 } from 'ts-morph'
 import * as fs from "node:fs";
 import * as path from "node:path";
@@ -17,17 +17,19 @@ function tsTypeToCj(type: string) {
         case "string":
             return "String"
         case "number":
-            return "Float64"
+            return "Number"
+        case "bigint":
+            return "Bigint"
         case "boolean":
-            return "Bool"
+            return "Boolean"
         case "void":
-            return ""
+            return "Void"
     }
 }
 
 function mapTsTypeToCj(node?: Node) {
     if (!node) {
-        return 'Unit';
+        return 'Undefined';
     }
     const type = node.getType()
     const typeText = type.getText();
@@ -35,6 +37,20 @@ function mapTsTypeToCj(node?: Node) {
         return "Any"
     }
     return tsTypeToCj(typeText)
+}
+
+function transformBlock(node: Node, indent = "", returnType = "") {
+    let cj = ''
+    cj += " {\n";
+    const _indent = `${indent}  `
+    node.forEachChild(n => {
+        cj += `${_indent}${transformNode(n, `${_indent}`)}`;
+    })
+    if (["Undefined", "Void"].includes(returnType) && !cj.includes(' return ')) {
+        cj += `\n${_indent}return Undefined();`
+    }
+    cj += `\n${indent}}`;
+    return cj
 }
 
 function transformNode(node: Node, indent = "") {
@@ -49,16 +65,12 @@ function transformNode(node: Node, indent = "") {
             const funName = funNode.getName();
             const params = funNode.getParameters().map(p => `${p.getName()}:${mapTsTypeToCj(p)}`)
             const returnType = mapTsTypeToCj(funNode.getReturnTypeNode());
-            const body = funNode.getBody() ? transformNode(funNode.getBody()!) : ""
+            const body = funNode.getBody() ? transformBlock(funNode.getBody()!, "", returnType) : ""
             cj += `func ${funName}(${params}):${returnType}${body}\n\n`
             break;
         case ts.SyntaxKind.Block: {
-            cj += " {\n";
-            const _indent = `${indent}  `
-            node.forEachChild(n => {
-                cj += `${_indent}${transformNode(n, `${_indent}`)}`;
-            })
-            cj += `\n${indent}}`;// console.log('Block',node.getText(),node.getChildAtIndex(2).getKindName(),node.getChildCount()) //console.log("cj",cj)
+            cj += transformBlock(node, indent)
+            // console.log('Block',node.getText(),node.getChildAtIndex(2).getKindName(),node.getChildCount()) //console.log("cj",cj)
         }
             break;
         case ts.SyntaxKind.ReturnStatement:
@@ -93,6 +105,17 @@ function transformNode(node: Node, indent = "") {
 
         }
             break;
+        case ts.SyntaxKind.VariableStatement:
+            const vsNode = node as VariableStatement;
+            const list = vsNode.getDeclarationList();
+            const kind = list.getDeclarationKind(); // const / let / var
+            const vl = list.getDeclarations();
+
+            vl.forEach(v => {
+                const initializer = v.getInitializer();
+                cj += `${kind === "const" ? "let" : kind} ${v.getName()} = ${initializer ? transformNode(initializer) : "Undefined();"}\n`
+            })
+            break;
         case ts.SyntaxKind.ExpressionStatement:
             cj += `${node.getText()}`;
             break;
@@ -100,6 +123,9 @@ function transformNode(node: Node, indent = "") {
             cj += `${node.getText()}`;
             break;
         case ts.SyntaxKind.Identifier:
+            cj += `${node.getText()}`;
+            break;
+        case ts.SyntaxKind.NumericLiteral:
             cj += `${node.getText()}`;
             break;
         case ts.SyntaxKind.PlusToken:
